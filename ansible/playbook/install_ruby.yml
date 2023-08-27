@@ -1,0 +1,41 @@
+---
+- hosts: localhost
+  connection: local
+  tasks:
+    - name: Install required dependencies
+      apt:
+        name:
+          - curl
+          - gpg
+          - dirmngr
+        state: present
+      become: yes
+
+    - name: Import RVM GPG keys
+      shell: "{{ item }}"
+      loop:
+        - "curl -sSL https://rvm.io/mpapis.asc | gpg --import -"
+        - "curl -sSL https://rvm.io/pkuczynski.asc | gpg --import -"
+      ignore_errors: yes  # Since importing the same key twice will produce an error
+
+    - name: Install RVM
+      shell: "curl -sSL https://get.rvm.io | bash -s stable"
+      become: yes
+
+    - name: Source RVM
+      shell: "source /usr/local/rvm/scripts/rvm"
+      args:
+        executable: /bin/bash
+
+    - name: Install Ruby using RVM
+      command: "/usr/local/rvm/bin/rvm install {{ ruby_version }}"
+      vars:
+        ruby_version: "3.0.0"
+      become: yes
+
+    - name: Set default Ruby version
+      command: "/usr/local/rvm/bin/rvm use {{ ruby_version }} --default"
+      vars:
+        ruby_version: "3.0.0"
+      become: yes
+

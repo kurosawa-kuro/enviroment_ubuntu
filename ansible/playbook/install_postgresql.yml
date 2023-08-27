@@ -1,0 +1,80 @@
+---
+- name: Install and configure PostgreSQL on Ubuntu 22
+  hosts: localhost
+  connection: local
+  become: yes
+  tasks:
+    - name: Ensure the software properties common package is installed
+      apt:
+        name: software-properties-common
+        state: present
+
+    - name: Install the PostgreSQL public key
+      apt_key:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        state: present
+
+    - name: Add PostgreSQL APT repository
+      apt_repository:
+        repo: deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main
+        state: present
+
+    - name: Install PostgreSQL
+      apt:
+        name: 
+          - postgresql-13
+          - postgresql-client-13
+          - libpq-dev
+        state: present
+        update_cache: yes
+
+    - name: Ensure PostgreSQL is running
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Install pip3 and psycopg2
+      apt:
+        name:
+          - python3-pip
+          - python3-psycopg2
+        state: present
+
+    - name: Set postgres user password using sudo and psql
+      command: sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'root_password';"
+
+    - name: Create a new database using psql
+      command: sudo -u postgres psql -c "CREATE DATABASE mydatabase;"
+
+    - name: Create a new user using psql
+      command: sudo -u postgres psql -c "CREATE USER myuser WITH PASSWORD 'mypassword'; GRANT ALL PRIVILEGES ON DATABASE mydatabase TO myuser;"
+
+    - name: Allow md5 password authentication
+      lineinfile:
+        path: /etc/postgresql/13/main/pg_hba.conf
+        regexp: 'local   all             postgres                                peer'
+        line: 'local   all             postgres                                md5'
+      notify:
+        - restart postgresql
+
+    - name: Allow all IP addresses to connect
+      lineinfile:
+        path: /etc/postgresql/13/main/pg_hba.conf
+        line: 'host    all     all     0.0.0.0/0       md5'
+        insertafter: EOF
+
+    - name: Allow external connections to PostgreSQL
+      lineinfile:
+        path: /etc/postgresql/13/main/postgresql.conf
+        regexp: '^#?listen_addresses'
+        line: "listen_addresses = '*'"
+      notify:
+        - restart postgresql
+
+  handlers:
+    - name: restart postgresql
+      service:
+        name: postgresql
+        state: restarted
+

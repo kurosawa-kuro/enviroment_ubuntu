@@ -1,0 +1,71 @@
+---
+- hosts: localhost
+  connection: local
+  become: yes
+  vars:
+    mysql_root_password: root_password
+
+  tasks:
+  - name: Update apt packages
+    apt:
+      update_cache: yes
+
+  - name: Install necessary python packages
+    apt:
+      name: python3-pymysql
+      state: present
+
+  - name: Install MySQL Server
+    apt:
+      name: mysql-server
+      state: present
+
+  - name: Ensure MySQL service is started
+    service:
+      name: mysql
+      state: started
+
+  - name: Allow external connections to MySQL
+    lineinfile:
+      path: /etc/mysql/mysql.conf.d/mysqld.cnf
+      regexp: '^bind-address'
+      line: 'bind-address = 0.0.0.0'
+      state: present
+
+  - name: Restart MySQL service for configuration to take effect
+    service:
+      name: mysql
+      state: restarted
+
+  - name: Set MySQL root password
+    mysql_user:
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+      name: root
+      password: "{{ mysql_root_password }}"
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+      check_implicit_admin: yes
+      state: present
+
+  - name: Change MySQL root authentication method
+    mysql_user:
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+      name: root
+      password: "{{ mysql_root_password }}"
+      plugin: mysql_native_password
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+      check_implicit_admin: yes
+      state: present
+  
+  - name: Grant all privileges to root from any host
+    mysql_user:
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+      name: root
+      host: '%'
+      password: "{{ mysql_root_password }}"
+      priv: '*.*:ALL,GRANT'
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+      state: present
+
